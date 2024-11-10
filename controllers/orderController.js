@@ -196,6 +196,8 @@ export const callbackPayment = asyncHandler(async (req, res) => {
     orderData.status = "pending";
   }
 
+  console.log(`Fraud : ${fraudStatus}`);
+
   await orderData.save();
 
   return res.status(200).send("Notifikasi pembayaran berhasil!");
