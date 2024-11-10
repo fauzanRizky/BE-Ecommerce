@@ -16,7 +16,12 @@ export const showAllProduct = asyncHandler(async (req, res) => {
 
   let query;
 
-  if (req.query.name) {
+  if (req.query.name && req.query.category) {
+    query = Product.find({
+      name: { $regex: req.query.name, $options: "i" },
+      category: req.query.category,
+    });
+  } else if (req.query.name) {
     query = Product.find({
       name: {
         $regex: req.query.name,
@@ -27,13 +32,17 @@ export const showAllProduct = asyncHandler(async (req, res) => {
     query = Product.find(queryObj);
   }
 
+  // if (req.query.category) {
+  //   query.category = req.query.category;
+  // }
+
   const page = req.query.page * 1 || 1; // Agar menjadi integer
-  const limitData = req.query.limit * 1 || 30;
+  const limitData = req.query.limit * 1 || 4;
   const skipData = (page - 1) * limitData;
 
   query = query.skip(skipData).limit(limitData);
 
-  let countProduct = await Product.countDocuments();
+  let countProduct = await Product.countDocuments(queryObj);
   if (req.query.page) {
     // const numProduct = await Product.countDocuments();
 
@@ -44,11 +53,16 @@ export const showAllProduct = asyncHandler(async (req, res) => {
   }
 
   const data = await query;
+  const totalPage = Math.ceil(countProduct / limitData);
 
   return res.status(200).json({
     message: "Berhasil menampilkan semua produk!",
     data,
-    count: countProduct,
+    pagination: {
+      totalPage,
+      page,
+      totalProduct: countProduct,
+    },
   });
 });
 
