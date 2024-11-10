@@ -149,56 +149,63 @@ export const currentUserOrder = asyncHandler(async (req, res) => {
 });
 
 export const callbackPayment = asyncHandler(async (req, res) => {
-  const statusResponse = await snap.transaction.notification(req.body);
+  try {
+    const statusResponse = await snap.transaction.notification(req.body);
 
-  let orderId = statusResponse.order_id;
-  let transactionStatus = statusResponse.transaction_status;
-  let fraudStatus = statusResponse.fraud_status;
+    let orderId = statusResponse.order_id;
+    let transactionStatus = statusResponse.transaction_status;
+    let fraudStatus = statusResponse.fraud_status;
 
-  const orderData = await Order.findById(orderId);
+    const orderData = await Order.findById(orderId);
+    if (!orderData) {
+      res.status(404);
+      throw new Error("Order tidak ditemukan!");
+    }
 
-  if (!orderData) {
-    res.status(404);
-    throw new Error("Order tidak ditemukan!");
-  }
+    // Log status yang diterima
+    console.log(
+      `Order ID: ${orderId}, Status Transaksi: ${transactionStatus}, Fraud Status: ${fraudStatus}`
+    );
 
-  // Sample transactionStatus handling logic
+    // Logika penanganan status transaksi
+    if (transactionStatus === "capture" || transactionStatus === "settlement") {
+      if (fraudStatus === "accept") {
+        const productOrder = orderData.itemsDetail;
 
-  if (transactionStatus == "capture" || transactionStatus == "settlement") {
-    if (fraudStatus == "accept") {
-      const productOrder = orderData.itemsDetail;
+        for (const productItem of productOrder) {
+          const productData = await Product.findById(productItem.product);
+          if (!productData) {
+            res.status(404);
+            throw new Error(
+              `Produk dengan ID ${productItem.product} tidak ditemukan!`
+            );
+          }
 
-      for (const productItem of productOrder) {
-        const productData = await Product.findById(productItem.product);
-
-        if (!productData) {
-          res.status(404);
-          throw new Error("Produk tidak ditemukan!");
+          // Kurangi stok produk
+          productData.stock -= productItem.quantity;
+          await productData.save();
+          console.log(
+            `Produk ${productData.name} stok dikurangi sebanyak ${productItem.quantity}. Stok baru: ${productData.stock}`
+          );
         }
 
-        productData.stock = productData.stock - productItem.quantity;
-
-        await productData.save();
+        orderData.status = "success";
       }
-      orderData.status = "success";
+    } else if (["cancel", "deny", "expire"].includes(transactionStatus)) {
+      orderData.status = "failed";
+    } else if (transactionStatus === "pending") {
+      orderData.status = "pending";
     }
-  } else if (
-    transactionStatus == "cancel" ||
-    transactionStatus == "deny" ||
-    transactionStatus == "expire"
-  ) {
-    // TODO set transaction status on your database to 'failure'
-    // and response with 200 OK
-    orderData.status = "failed";
-  } else if (transactionStatus == "pending") {
-    // TODO set transaction status on your database to 'pending' / waiting payment
-    // and response with 200 OK
-    orderData.status = "pending";
+
+    await orderData.save();
+    console.log(`Order status diperbarui ke: ${orderData.status}`);
+
+    // Respon setelah semua operasi berhasil
+    return res.status(200).send("Notifikasi pembayaran berhasil diproses!");
+  } catch (error) {
+    console.error("Error pada callback pembayaran:", error);
+    res
+      .status(500)
+      .send("Terjadi kesalahan saat memproses notifikasi pembayaran.");
   }
-
-  console.log(`Fraud : ${fraudStatus}`);
-
-  await orderData.save();
-
-  return res.status(200).send("Notifikasi pembayaran berhasil!");
 });
