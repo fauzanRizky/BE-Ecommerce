@@ -149,25 +149,6 @@ export const currentUserOrder = asyncHandler(async (req, res) => {
 });
 
 export const callbackPayment = asyncHandler(async (req, res) => {
-  const statusResponse = await snap.transaction.notification(req.body);
-
-  let orderId = statusResponse.order_id;
-  let transactionStatus = statusResponse.transaction_status;
-  let fraudStatus = statusResponse.fraud_status;
-
-  const orderData = await Order.findById(orderId);
-
-  if (!orderData) {
-    res.status(404);
-    throw new Error("Order tidak ditemukan!");
-  }
-
-  // Log status yang diterima
-  console.log(
-    `Order ID: ${orderId}, Status Transaksi: ${transactionStatus}, Fraud Status: ${fraudStatus}`
-  );
-
-  /*
   try {
     const statusResponse = await snap.transaction.notification(req.body);
 
@@ -228,5 +209,4 @@ export const callbackPayment = asyncHandler(async (req, res) => {
       .status(500)
       .send("Terjadi kesalahan saat memproses notifikasi pembayaran.");
   }
-  */
 });
