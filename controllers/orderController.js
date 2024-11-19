@@ -32,7 +32,15 @@ export const createOrder = asyncHandler(async (req, res) => {
       throw new Error("Id produk tidak ditemukan!");
     }
 
-    const { name, price, _id } = productData;
+    const { name, price, _id, stock } = productData;
+
+    if (cart.quantity > stock) {
+      res.status(404);
+      throw new Error(
+        `Jumlah produk ${name} yang diorder tidak boleh melebihi jumlah stok saat ini [ ${stock} pcs ] !`
+      );
+    }
+
     const singleProduct = {
       quantity: cart.quantity,
       name,
@@ -139,7 +147,7 @@ export const detailOrder = asyncHandler(async (req, res) => {
 });
 
 export const currentUserOrder = asyncHandler(async (req, res) => {
-  const order = await Order.findOne({
+  const order = await Order.find({
     user: req.user.id,
   });
   return res.status(200).json({
